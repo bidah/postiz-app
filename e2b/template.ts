@@ -23,6 +23,7 @@ export const template = Template()
     "pg_dropcluster --stop 15 main || true",
     "pg_createcluster 15 main",
     "sed -i \"s/^#listen_addresses.*/listen_addresses = 'localhost'/\" /etc/postgresql/15/main/postgresql.conf",
+    "sed -i 's/^ssl = on/ssl = off/' /etc/postgresql/15/main/postgresql.conf",
   ])
   .copy("start.sh", "/opt/postiz-e2b/start.sh", { mode: 0o755 })
   .copy("stop.sh", "/opt/postiz-e2b/stop.sh", { mode: 0o755 })

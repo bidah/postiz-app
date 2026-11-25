@@ -9,11 +9,16 @@ set -euo pipefail
 : "${FRONTEND_URL:?FRONTEND_URL is required}"
 : "${JWT_SECRET:?JWT_SECRET is required}"
 LOG=/var/log/postiz-e2b
-mkdir -p "$LOG" /uploads
+mkdir -p "$LOG" /uploads && chmod 777 "$LOG"
 
 # --- postgres -----------------------------------------------------------------
-pg_ctlcluster 15 main start 2>/dev/null || true
+# pg_ctl directly (pg_ctlcluster hands off to systemd as root); no SSL inside the sandbox.
+if ! pg_isready -q; then
+  su postgres -c "/usr/lib/postgresql/15/bin/pg_ctl -D /var/lib/postgresql/15/main \
+    -o '-c config_file=/etc/postgresql/15/main/postgresql.conf -c ssl=off' -l $LOG/postgres.log -w start"
+fi
 for i in $(seq 1 30); do pg_isready -q && break; sleep 1; done
+pg_isready -q || { echo "postgres did not start" >&2; tail -20 "$LOG/postgres.log" >&2; exit 1; }
 su postgres -c "psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='postiz'\"" | grep -q 1 \
   || su postgres -c "psql -c \"CREATE ROLE postiz LOGIN PASSWORD 'postiz'\""
 su postgres -c "psql -tAc \"SELECT 1 FROM pg_database WHERE datname='postiz'\"" | grep -q 1 \
